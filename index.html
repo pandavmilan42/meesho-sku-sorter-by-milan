@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Meesho A-Z SKU Sorter</title>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+
+    <style>
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg,#667eea,#764ba2);
+            display:flex;
+            justify-content:center;
+            align-items:center;
+            height:100vh;
+            margin:0;
+        }
+
+        .card {
+            background:white;
+            width:500px;
+            padding:30px;
+            border-radius:15px;
+            box-shadow:0 15px 40px rgba(0,0,0,0.2);
+            text-align:center;
+        }
+
+        h2 {
+            margin-bottom:20px;
+        }
+
+        input[type="file"] {
+            margin-bottom:15px;
+        }
+
+        button {
+            padding:10px 20px;
+            border:none;
+            border-radius:8px;
+            background:#667eea;
+            color:white;
+            cursor:pointer;
+            font-weight:bold;
+            margin-top:10px;
+        }
+
+        button:hover {
+            background:#5a67d8;
+        }
+
+        #status {
+            margin-top:15px;
+            font-size:14px;
+            color:green;
+        }
+
+        .footer {
+            margin-top:20px;
+            font-size:12px;
+            color:#777;
+        }
+
+        #preview {
+            margin-top:10px;
+            height:100px;
+            overflow:auto;
+            font-size:12px;
+            background:#f3f3f3;
+            padding:10px;
+            border-radius:8px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2>📦 Meesho A–Z SKU Sorter</h2>
+
+    <input type="file" id="pdfUpload" accept="application/pdf">
+    <br>
+    <button onclick="processPDF()">Sort A–Z & Download</button>
+
+    <div id="status"></div>
+    <div id="preview"></div>
+
+    <div class="footer">
+        Built for Indian Sellers ❤️
+    </div>
+</div>
+
+<script>
+
+async function processPDF() {
+
+    const file = document.getElementById("pdfUpload").files[0];
+    if (!file) {
+        alert("Upload PDF first");
+        return;
+    }
+
+    document.getElementById("status").innerText = "Processing PDF...";
+
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({data: arrayBuffer}).promise;
+
+    let pagesData = [];
+
+    for (let i = 1; i <= pdf.numPages; i++) {
+
+        const page = await pdf.getPage(i);
+        const textContent = await page.getTextContent();
+        const text = textContent.items.map(item => item.str).join("\n");
+
+        let sku = "zzzzzz";
+
+        const match = text.match(/SKU\s+Size\s+Qty\s+Color\s+Order No\.\s*\n([^\s]+)/i);
+
+        if (match && match[1]) {
+            sku = match[1].trim();
+        }
+
+        pagesData.push({
+            pageNumber: i,
+            sku: sku
+        });
+    }
+
+    // Preview before sorting
+    document.getElementById("preview").innerText =
+        "Extracted SKU List:\n\n" +
+        pagesData.map(p => p.sku).join("\n");
+
+    pagesData.sort((a, b) => a.sku.localeCompare(b.sku));
+
+    const pdfDoc = await PDFLib.PDFDocument.load(arrayBuffer);
+    const newPdf = await PDFLib.PDFDocument.create();
+
+    for (let item of pagesData) {
+        const [copiedPage] = await newPdf.copyPages(pdfDoc, [item.pageNumber - 1]);
+        newPdf.addPage(copiedPage);
+    }
+
+    const newPdfBytes = await newPdf.save();
+
+    const blob = new Blob([newPdfBytes], { type: "application/pdf" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "sorted_AZ_labels.pdf";
+    link.click();
+
+    document.getElementById("status").innerText = "✅ PDF Sorted Successfully!";
+}
+
+</script>
+
+</body>
+</html>
